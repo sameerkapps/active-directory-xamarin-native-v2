@@ -30,6 +30,7 @@ namespace UserDetailsClient.UWP
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
+            PCAHelper.PCAHelper.IsUWP = true;
         }
 
         /// <summary>

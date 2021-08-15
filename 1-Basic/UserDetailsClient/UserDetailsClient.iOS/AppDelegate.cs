@@ -22,7 +22,6 @@ namespace UserDetailsClient.iOS
         {
             global::Xamarin.Forms.Forms.Init();
             LoadApplication(new App());
-            App.ParentWindow = null; // no UI parent on iOS
             return base.FinishedLaunching(app, options);            
         }
 

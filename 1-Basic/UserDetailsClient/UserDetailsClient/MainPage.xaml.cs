@@ -19,65 +19,29 @@ namespace UserDetailsClient
 
         async void OnSignInSignOut(object sender, EventArgs e)
         {
-            AuthenticationResult authResult = null;
-            IEnumerable<IAccount> accounts = await App.PCA.GetAccountsAsync().ConfigureAwait(false);
             try
             {
                 if (btnSignInSignOut.Text == "Sign in")
                 {
-                    try
+                    var authResult = await PCAHelper.PCAHelper.Instance.EnsureAuthenticatedAsync(customizeInteractive: (builder) =>
                     {
-                        IAccount firstAccount = accounts.FirstOrDefault();
-                        authResult = await App.PCA.AcquireTokenSilent(App.Scopes, firstAccount)
-                                              .ExecuteAsync()
-                                              .ConfigureAwait(false);
-                    }
-                    catch (MsalUiRequiredException)
-                    {
-                        try
-                        { 
-                            var builder = App.PCA.AcquireTokenInteractive(App.Scopes)
-                                                                       .WithParentActivityOrWindow(App.ParentWindow);
-
-                            if (Device.RuntimePlatform != "UWP")
-                            {
-                                // on Android and iOS, prefer to use the system browser, which does not exist on UWP
-                                SystemWebViewOptions systemWebViewOptions = new SystemWebViewOptions()
-                                {                            
-                                    iOSHidePrivacyPrompt = true,
-                                };
-
-                                builder.WithSystemWebViewOptions(systemWebViewOptions);
-                                builder.WithUseEmbeddedWebView(false);
-                            }
-
-                            authResult = await builder.ExecuteAsync().ConfigureAwait(false);
-                        }
-                        catch (Exception ex2)
-                        {
-                            await DisplayAlert("Acquire token interactive failed. See exception message for details: ", ex2.Message, "Dismiss");
-                        }
-                    }
+                        builder.WithAuthority(AadAuthorityAudience.AzureAdAndPersonalMicrosoftAccount);
+                    });
 
                     if (authResult != null)
                     {
-                        var content = await GetHttpContentWithTokenAsync(authResult.AccessToken);
+                        var content = await GetHttpContentWithTokenAsync();
                         UpdateUserContent(content);
                     }
                 }
                 else
                 {
-                    while (accounts.Any())
-                    {
-                        await App.PCA.RemoveAsync(accounts.FirstOrDefault()).ConfigureAwait(false);
-                        accounts = await App.PCA.GetAccountsAsync().ConfigureAwait(false);
-                    }
+                    await PCAHelper.PCAHelper.Instance.SignOutAsync();
 
-                    
-                    Device.BeginInvokeOnMainThread(() => 
+                    Device.BeginInvokeOnMainThread(() =>
                     {
                         slUser.IsVisible = false;
-                        btnSignInSignOut.Text = "Sign in"; 
+                        btnSignInSignOut.Text = "Sign in";
                     });
                 }
             }
@@ -108,14 +72,14 @@ namespace UserDetailsClient
             }
         }
 
-        public async Task<string> GetHttpContentWithTokenAsync(string token)
+        public async Task<string> GetHttpContentWithTokenAsync()
         {
             try
             {
                 //get data from API
                 HttpClient client = new HttpClient();
                 HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me");
-                message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                PCAHelper.PCAHelper.Instance.AddAuthenticationBearerToken(message);
                 HttpResponseMessage response = await client.SendAsync(message).ConfigureAwait(false);
                 string responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 return responseString;
